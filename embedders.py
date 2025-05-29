@@ -41,6 +41,7 @@ class Embedder:
                 title = matches[i] if i < len(matches) else ''
                 chunk = f"{title}\n{chunk_text}" if title else chunk_text
                 chunks.append(chunk)
+        chunks.pop(0)
         return chunks
 
     def create_save_embeddings(self, chunks, type, embeddings_name):
