@@ -12,7 +12,6 @@ def main():
     article = config.get("ARTICLE")
 
     evaluator = CosineSimilarityEvaluator(subject, article)
-    print(evaluator.cosine_scores)
     evaluator.plot_smoothings()
 
 if __name__ == "__main__":
