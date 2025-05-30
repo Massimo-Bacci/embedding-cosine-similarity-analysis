@@ -19,9 +19,8 @@ def embed_all_files(embedder_class, directory, model, label):
 
 
 def main():
-    model = SentenceTransformer('distiluse-base-multilingual-cased-v2')
+    model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
 
-    # Embed all articles
     embed_all_files(
         embedder_class=ArticleEmbedder,
         directory="data/raw/articles",
@@ -29,7 +28,6 @@ def main():
         label="Article"
     )
 
-    # Embed all subjects
     embed_all_files(
         embedder_class=SubjectEmbedder,
         directory="data/raw/subjects",
