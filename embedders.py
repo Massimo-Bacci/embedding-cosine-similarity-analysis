@@ -1,19 +1,32 @@
+import json
 import re
 import torch
+from enum import Enum
+from sentence_transformers import SentenceTransformer
+ 
+class Month(Enum):
+    janvier = "Jan"
+    février = "Feb"
+    mars = "Mar"
+    avril = "Apr"
+    mai = "May"
+    juin = "Jun"
+    juillet = "Jul"
+    août = "Aug"
+    septembre = "Sep"
+    octobre = "Oct"
+    novembre = "Nov"
+    décembre = "Dec"
 
-class Embedder:
-    def __init__(self, model):
+class ArticleEmbedder():
+    def __init__(self, model, article_name):
         self.model = model
+        self.txt_path = f"data\\raw\\articles\\{article_name}.txt"
 
     @staticmethod
     def open_text(txt_path):
         with open(txt_path, "r", encoding="utf-8") as f:
             return f.read()
-
-    @staticmethod
-    def create_paragraphs_chunks(text):
-        chunks = re.split(r'(?<=[.!?])\s*\n', text)
-        return [chunk.strip() for chunk in chunks if len(chunk.strip().split()) >= 30]
 
     @staticmethod
     def create_articles_chunks(text):
@@ -43,28 +56,83 @@ class Embedder:
                 chunks.append(chunk)
         chunks.pop(0)
         return chunks
+    
+    @staticmethod
+    def create_dated_chunks(chunks):
+        dates = []
+        processed_chunks = []
 
-    def create_save_embeddings(self, chunks, type, embeddings_name):
-        embedded_chunks = self.model.encode(chunks, convert_to_tensor=True)
-        torch.save(embedded_chunks, f'data\\embeddings\\articles\\{embeddings_name}.pt' if type == 0 else f'data\\embeddings\\subjects\\{embeddings_name}.pt' if type == 1 else None)
-            
-class ArticleEmbedder(Embedder):
-    def __init__(self, model, article_name):
-        super().__init__(model)
-        self.txt_path = f"data\\raw\\articles\\{article_name}.txt"
+        for i, chunk in enumerate(chunks):
+            lines = chunk.splitlines()
+
+            # Extract the date line for key construction
+            if i < len(chunks) - 1:
+                line = lines[1].strip()  # date line is second line for non-last chunks
+            else:
+                line = lines[0].strip()  # date line is first line for last chunk
+
+            words = line.split()
+            month_fr, year = words[-2], words[-1]
+            month_en = None
+            for month in Month:
+                if month.name.lower() == month_fr.lower():
+                    month_en = month.value
+                    break
+
+            if month_en:
+                dates.append(f"{month_en} {year}")
+            else:
+                dates.append(f"{month_fr} {year}")  # fallback if not found
+
+            # Now modify chunk by removing lines
+            if i < len(chunks) - 1:
+                # Remove first two lines
+                modified_chunk = "\n".join(lines[2:])
+            else:
+                # Remove only first line
+                modified_chunk = "\n".join(lines[1:])
+
+            processed_chunks.append(modified_chunk)
+
+        dated_chunks = dict(zip(dates, processed_chunks))
+        return dated_chunks
+
+    
+    def create_save_articles_dated_embeddings(self, dated_chunks, article_name):
+        keys = list(dated_chunks.keys())
+        strings = [dated_chunks[k] for k in keys]
+
+        embedded_chunks = self.model.encode(strings, convert_to_tensor=True)
+
+        embedded_data = {
+            k: embedding.tolist() for k, embedding in zip(keys, embedded_chunks)
+        }
+
+        with open(f'data\\embeddings\\articles\\{article_name}.json', 'w', encoding='utf-8') as f:
+            json.dump(embedded_data, f, indent=2)
 
     def __call__(self):
         text = self.open_text(self.txt_path)
         articles_chunks = self.create_articles_chunks(text)
+        dated_chunks = self.create_dated_chunks(articles_chunks)
         filename = self.txt_path.split('\\')[-1].rsplit('.txt', 1)[0]
-        self.create_save_embeddings(articles_chunks, 0, f"{filename} embedding")
+        self.create_save_articles_dated_embeddings(dated_chunks, f"{filename} embedding")
 
-class SubjectEmbedder(Embedder):
+class SubjectEmbedder():    
     def __init__(self, model, subject_name):
-        super().__init__(model)
+        self.model = model
         self.txt_path = f"data\\raw\\subjects\\{subject_name}.txt"
+
+    @staticmethod
+    def open_text(txt_path):
+        with open(txt_path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def create_save_subjects_embeddings(self, subject_text, embeddings_name):
+        embedded_subject_text = self.model.encode(subject_text, convert_to_tensor=True)
+        torch.save(embedded_subject_text, f'data\\embeddings\\subjects\\{embeddings_name}.pt')
 
     def __call__(self):
         text = self.open_text(self.txt_path)
         filename = self.txt_path.split('\\')[-1].rsplit('.txt', 1)[0]
-        self.create_save_embeddings(text, 1, f"{filename} embedding")
+        self.create_save_subjects_embeddings(text, f"{filename} embedding")
