@@ -1,19 +1,21 @@
-import json
+import os
 from cosine_similarity_evaluator import CosineSimilarityEvaluator
 
-def load_config(path='config\\config.json'):
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+def get_txt_filenames(directory):
+    return [f for f in os.listdir(directory) if f.endswith('.txt')]
 
 def main():
-    config = load_config()
+    subjects_dir = 'data/raw/subjects'
+    articles_dir = 'data/raw/articles'
 
-    subject = config.get("SUBJECT")
-    article = config.get("ARTICLE")
+    subjects = get_txt_filenames(subjects_dir)
+    articles = get_txt_filenames(articles_dir)
 
-    evaluator = CosineSimilarityEvaluator(subject, article)
-    evaluator.compute_cosine_scores() 
-    evaluator.plot_similarity_over_time()     
+    for subject in subjects:
+        for article in articles:
+            evaluator = CosineSimilarityEvaluator(subject, article)
+            evaluator.compute_cosine_scores()
+            evaluator.plot_similarity_over_time()
 
 if __name__ == "__main__":
     main()

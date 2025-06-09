@@ -59,57 +59,60 @@ class ArticleEmbedder():
     
     @staticmethod
     def create_dated_chunks(chunks):
-        dates = []
-        processed_chunks = []
+        processed = {}
 
         for i, chunk in enumerate(chunks):
             lines = chunk.splitlines()
 
-            # Extract the date line for key construction
+            # Extract date line
             if i < len(chunks) - 1:
-                line = lines[1].strip()  # date line is second line for non-last chunks
+                line = lines[1].strip()
             else:
-                line = lines[0].strip()  # date line is first line for last chunk
+                line = lines[0].strip()
 
             words = line.split()
             month_fr, year = words[-2], words[-1]
             month_en = None
+
             for month in Month:
                 if month.name.lower() == month_fr.lower():
                     month_en = month.value
                     break
 
-            if month_en:
-                dates.append(f"{month_en} {year}")
-            else:
-                dates.append(f"{month_fr} {year}")  # fallback if not found
+            date_str = f"{month_en or month_fr} {year}"
 
-            # Now modify chunk by removing lines
+            # Clean chunk text
             if i < len(chunks) - 1:
-                # Remove first two lines
                 modified_chunk = "\n".join(lines[2:])
             else:
-                # Remove only first line
                 modified_chunk = "\n".join(lines[1:])
 
-            processed_chunks.append(modified_chunk)
+            # Create unique key
+            chunk_key = f"chunk_{i}"
+            processed[chunk_key] = {
+                "date": date_str,
+                "article": modified_chunk.strip()
+            }
 
-        dated_chunks = dict(zip(dates, processed_chunks))
-        return dated_chunks
+        return processed
 
     
     def create_save_articles_dated_embeddings(self, dated_chunks, article_name):
         keys = list(dated_chunks.keys())
-        strings = [dated_chunks[k] for k in keys]
+        strings = [dated_chunks[k]["article"] for k in keys]
 
         embedded_chunks = self.model.encode(strings, convert_to_tensor=True)
 
         embedded_data = {
-            k: embedding.tolist() for k, embedding in zip(keys, embedded_chunks)
+            k: {
+                "date": dated_chunks[k]["date"],
+                "embedding": embedding.tolist()
+            }
+            for k, embedding in zip(keys, embedded_chunks)
         }
 
         with open(f'data\\embeddings\\articles\\{article_name}.json', 'w', encoding='utf-8') as f:
-            json.dump(embedded_data, f, indent=2)
+            json.dump(embedded_data, f, indent=2, ensure_ascii=False)
 
     def __call__(self):
         text = self.open_text(self.txt_path)
